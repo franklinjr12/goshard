@@ -4,28 +4,21 @@ package main
 
 import (
 	"fmt"
+	"goshard/lib/service"
 	"io/ioutil"
 	"net/http"
-	"strings"
+	"net/url"
 )
 
-func fomatStrToUrl(str string) string {
-	// replace the spaces with %20
-	str = strings.Replace(str, " ", "%20", -1)
-	// replace the commas with %2C
-	str = strings.Replace(str, ",", "%2C", -1)
-	// replace the quotes with %22
-	str = strings.Replace(str, "\"", "%22", -1)
-	// replace the brackets with %5B and %5D
-	str = strings.Replace(str, "[", "%5B", -1)
-	str = strings.Replace(str, "]", "%5D", -1)
-	return str
-}
-
 func main() {
-	query := fomatStrToUrl("SELECT id, name FROM users")
+	request := service.Request{
+		Query:    "SELECT id, name FROM users",
+		Shardid:  1,
+		Sharduid: "",
+	}
+	queryUrlEncoded := url.PathEscape(request.Query)
 	const url = "http://localhost:8080/query?"
-	urlParams := fmt.Sprintf("query=%s", query)
+	urlParams := fmt.Sprintf("query=%s&shardid=%d&sharduid=%s", queryUrlEncoded, request.Shardid, request.Sharduid)
 	fmt.Println("URL:", url+urlParams)
 	// build the get request
 	req, err := http.NewRequest("GET", url+urlParams, nil)
