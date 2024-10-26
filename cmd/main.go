@@ -10,52 +10,20 @@ import (
 func main() {
 	fmt.Println("Running")
 
-	// init the mapper with some data for testing
-	dbmapper.AddDbMapId(1, database.DbTestConnectionString)
+	dbDefault := database.DbTestConnectionParams
 
-	connectionParams := database.DbTestConnectionParams
-	connectionParams.Dbname = ""
-	dsn := database.BuildConnectionString(connectionParams)
-	fmt.Println("conencting to db")
-	// db, err := database.Connect("host=localhost port=5432 user=postgres password=postgres sslmode=disable")
-	db, err := database.Connect(dsn)
-	if err != nil {
-		fmt.Println(err)
-		database.Close(db)
-		return
-	}
-	fmt.Println("creating database")
-	dbname := "testapplication1"
-	res, err := db.Exec("CREATE DATABASE " + dbname)
-	if err != nil {
-		fmt.Println(err)
-		database.Close(db)
-		return
-	}
-	fmt.Println(res)
-	database.Close(db)
-	connectionParams.Dbname = dbname
-	dsn = database.BuildConnectionString(connectionParams)
-	fmt.Println("conencting to db")
-	db, err = database.Connect(dsn)
-	if err != nil {
-		fmt.Println(err)
-		database.Close(db)
-		return
-	}
-	fmt.Println("creating from schema")
-	schemaStr, err := database.ReadSchemaFromFile("sql/schema.sql")
-	if err != nil {
-		fmt.Println(err)
-		database.Close(db)
-		return
-	}
-	err = database.CreateDatabaseFromSchema(db, schemaStr)
-	if err != nil {
-		fmt.Println(err)
-	}
-	database.Close(db)
-	return // just for testing
+	dbParams1 := dbDefault
+	dbParams1.Dbname = dbParams1.Dbname + "1"
+	db1Dsn := database.BuildConnectionString(dbParams1)
+
+	dbParams2 := dbDefault
+	dbParams2.Dbname = dbParams2.Dbname + "2"
+	db2Dsn := database.BuildConnectionString(dbParams2)
+
+	// init the mapper with some data for testing
+	dbmapper.AddDbMapId(0, database.DbTestConnectionString)
+	dbmapper.AddDbMapId(1, db1Dsn)
+	dbmapper.AddDbMapId(2, db2Dsn)
 
 	servicelistener.ListenAndServe()
 }
