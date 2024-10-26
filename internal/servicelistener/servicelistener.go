@@ -8,7 +8,9 @@ import (
 	"goshard/internal/dbmapper"
 	"goshard/lib/service"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 // ListenAndServe starts the HTTP server
@@ -50,23 +52,33 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// find the database on the map
 	dbConnectionString, err := dbmapper.GetDbConnectionString(serviceRequest.Shardid, serviceRequest.Sharduid)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "dbMap not found") {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println("Database connection string:", dbConnectionString)
 	if dbConnectionString == "" {
-		// need to create db
-		// not implemented yet
-		fmt.Println("Database creation not implemented")
-		return
+		fmt.Println("Database dsn not found in mapper. Creating new")
+		dsn, err := createDatabase(&serviceRequest)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Fprintln(w, "new database creation failed")
+			return
+		}
+		dbConnectionString = dbmapper.DbConnectionString(dsn)
 	}
 	fmt.Println("Database connection string:", dbConnectionString)
 	// forward the request to the database
 	fmt.Println("Forwarding request to database")
-	db, err := database.Connect(database.DbTestConnectionString)
+	db, err := database.Connect(string(dbConnectionString))
 	if err != nil {
-		fmt.Println(err)
-		return
+		if strings.Contains(err.Error(), "failed to ping") {
+			fmt.Println("Database creation not implemented")
+			return
+		} else {
+			fmt.Println(err)
+			return
+		}
 	}
 	rows, err := database.Query(db, query)
 	if err != nil {
@@ -91,4 +103,58 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
+}
+
+func createDatabase(requestParams *service.Request) (string, error) {
+	dbParams := database.DbTestConnectionParams
+	dbParams.Dbname = ""
+	dsn := database.BuildConnectionString(dbParams)
+	db, err := database.Connect(dsn)
+	if err != nil {
+		db.Close()
+		return "", err
+	}
+	if requestParams.Shardid != 0 {
+		dbParams.Dbname = fmt.Sprintf("%s%d", database.DbTestConnectionParams.Dbname, requestParams.Shardid)
+	} else {
+		dbParams.Dbname = fmt.Sprintf("%s%s", database.DbTestConnectionParams.Dbname, requestParams.Sharduid)
+	}
+	if !isValidDatabaseName(dbParams.Dbname) {
+		db.Close()
+		return "", fmt.Errorf("Invalid database name: %s", dbParams.Dbname)
+	}
+	fmt.Println("Creating database:", dbParams.Dbname)
+	_, err = db.Exec("CREATE DATABASE " + dbParams.Dbname)
+	if err != nil {
+		db.Close()
+		return "", err
+	}
+	db.Close()
+	dsn = database.BuildConnectionString(dbParams)
+	db, err = database.Connect(dsn)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+	schemaStr, err := database.ReadSchemaFromFile("sql/schema.sql")
+	if err != nil {
+		return "", err
+	}
+	err = database.CreateDatabaseFromSchema(db, schemaStr)
+	if err != nil {
+		return "", err
+	}
+	if requestParams.Shardid != 0 {
+		dbmapper.AddDbMapId(requestParams.Shardid, dsn)
+	} else {
+		dbmapper.AddDbMapUid(requestParams.Sharduid, dsn)
+	}
+	return dsn, nil
+}
+
+// isValidDatabaseName checks if the database name contains only valid characters
+func isValidDatabaseName(name string) bool {
+	// Allow only alphanumeric characters and underscores
+	var validName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+	return validName.MatchString(name)
 }

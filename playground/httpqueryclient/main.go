@@ -13,7 +13,7 @@ import (
 func main() {
 	request := service.Request{
 		Query:    "SELECT id, name FROM users",
-		Shardid:  0,
+		Shardid:  2,
 		Sharduid: "",
 	}
 	queryUrlEncoded := url.PathEscape(request.Query)
