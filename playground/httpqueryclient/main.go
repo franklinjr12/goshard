@@ -12,13 +12,14 @@ import (
 
 func main() {
 	request := service.Request{
-		Query:    "SELECT id, name FROM users",
-		Shardid:  2,
-		Sharduid: "",
+		Query:     "SELECT id, name FROM users",
+		Shardid:   3,
+		Sharduid:  "",
+		UserToken: "12345678",
 	}
 	queryUrlEncoded := url.PathEscape(request.Query)
 	const url = "http://localhost:8080/query?"
-	urlParams := fmt.Sprintf("query=%s&shardid=%d&sharduid=%s", queryUrlEncoded, request.Shardid, request.Sharduid)
+	urlParams := fmt.Sprintf("query=%s&shardid=%d&sharduid=%s&usertoken=%s", queryUrlEncoded, request.Shardid, request.Sharduid, request.UserToken)
 	fmt.Println("URL:", url+urlParams)
 	// build the get request
 	req, err := http.NewRequest("GET", url+urlParams, nil)

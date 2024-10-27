@@ -4,6 +4,7 @@ package servicelistener
 
 import (
 	"fmt"
+	"goshard/internal/config"
 	"goshard/internal/database"
 	"goshard/internal/dbmapper"
 	"goshard/lib/service"
@@ -26,10 +27,12 @@ func parseUrlToRequest(r *http.Request) service.Request {
 		shardid = 0
 	}
 	sharduid := r.URL.Query().Get("sharduid")
+	userToken := r.URL.Query().Get("usertoken")
 	return service.Request{
-		Query:    query,
-		Shardid:  uint64(shardid),
-		Sharduid: sharduid,
+		Query:     query,
+		Shardid:   uint64(shardid),
+		Sharduid:  sharduid,
+		UserToken: userToken,
 	}
 }
 
@@ -39,7 +42,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("URL:", r.URL)
 	fmt.Println("Params:", r.URL.Query())
 	fmt.Println("Request:", serviceRequest)
-	if serviceRequest.Query == "" || serviceRequest.Shardid == 0 && serviceRequest.Sharduid == "" {
+	if serviceRequest.Query == "" || (serviceRequest.Shardid == 0 && serviceRequest.Sharduid == "") || serviceRequest.UserToken == "" {
 		fmt.Fprintln(w, "Invalid request")
 		return
 	}
@@ -121,7 +124,7 @@ func createDatabase(requestParams *service.Request) (string, error) {
 	}
 	if !isValidDatabaseName(dbParams.Dbname) {
 		db.Close()
-		return "", fmt.Errorf("Invalid database name: %s", dbParams.Dbname)
+		return "", fmt.Errorf("invalid database name: %s", dbParams.Dbname)
 	}
 	fmt.Println("Creating database:", dbParams.Dbname)
 	_, err = db.Exec("CREATE DATABASE " + dbParams.Dbname)
@@ -136,7 +139,11 @@ func createDatabase(requestParams *service.Request) (string, error) {
 		return "", err
 	}
 	defer db.Close()
-	schemaStr, err := database.ReadSchemaFromFile("sql/schema.sql")
+	userId, err := config.QueryUserIdFromDbConfig(requestParams.UserToken)
+	if err != nil {
+		return "", err
+	}
+	schemaStr, err := config.ReadSchemaFromDbConfig(userId)
 	if err != nil {
 		return "", err
 	}
