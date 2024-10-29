@@ -46,6 +46,12 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Invalid request")
 		return
 	}
+	userToken := serviceRequest.UserToken
+	fmt.Println("token:", userToken)
+	if len(userToken) == 0 {
+		fmt.Fprintln(w, "No user token provided")
+		return
+	}
 	// get the query param from the get request
 	query := serviceRequest.Query
 	fmt.Println("Query:", query)
@@ -53,24 +59,20 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "No query provided")
 		return
 	}
-	// find the database on the map
-	dbConnectionString, err := dbmapper.GetDbConnectionString(serviceRequest.Shardid, serviceRequest.Sharduid)
-	if err != nil && !strings.Contains(err.Error(), "dbMap not found") {
+	userId, err := config.QueryUserIdFromDbConfig(userToken)
+	if err != nil {
 		fmt.Println(err)
+		fmt.Fprintln(w, "failed to query user id from db")
 		return
 	}
+	fmt.Println("User id:", userId)
+	dbConnectionString, err := fetchConnectionString(userId, &serviceRequest)
 	fmt.Println("Database connection string:", dbConnectionString)
-	if dbConnectionString == "" {
-		fmt.Println("Database dsn not found in mapper. Creating new")
-		dsn, err := createDatabase(&serviceRequest)
-		if err != nil {
-			fmt.Println(err)
-			fmt.Fprintln(w, "new database creation failed")
-			return
-		}
-		dbConnectionString = dbmapper.DbConnectionString(dsn)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Fprintln(w, "failed to fetch connection string")
+		return
 	}
-	fmt.Println("Database connection string:", dbConnectionString)
 	// forward the request to the database
 	fmt.Println("Forwarding request to database")
 	db, err := database.Connect(string(dbConnectionString))
@@ -164,4 +166,41 @@ func isValidDatabaseName(name string) bool {
 	// Allow only alphanumeric characters and underscores
 	var validName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 	return validName.MatchString(name)
+}
+
+func fetchConnectionString(userId uint64, serviceRequest *service.Request) (dbmapper.DbConnectionString, error) {
+	dbConnectionString, err := dbmapper.GetDbConnectionStringByUserId(userId, serviceRequest.Shardid, serviceRequest.Sharduid)
+	if err != nil && !strings.Contains(err.Error(), dbmapper.DbMapNotFoundStr) {
+		return "", err
+	}
+	if err != nil && strings.Contains(err.Error(), dbmapper.DbMapNotFoundStr) {
+		fmt.Println("Database dsn not found in mapper. Creating new")
+		dsn, err := createDatabase(serviceRequest)
+		if err != nil {
+			return "", err
+		}
+		err = config.WriteNewMapping(userId, serviceRequest.Shardid, serviceRequest.Sharduid, dsn)
+		if err != nil {
+			return "", err
+		}
+		return dbmapper.DbConnectionString(dsn), nil
+	}
+	return dbConnectionString, nil
+	// // find the database on the map
+	// dbConnectionString, err := dbmapper.GetDbConnectionString(serviceRequest.Shardid, serviceRequest.Sharduid)
+	// if err != nil && !strings.Contains(err.Error(), "dbMap not found") {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// fmt.Println("Database connection string:", dbConnectionString)
+	// if dbConnectionString == "" {
+	// 	fmt.Println("Database dsn not found in mapper. Creating new")
+	// 	dsn, err := createDatabase(&serviceRequest)
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 		fmt.Fprintln(w, "new database creation failed")
+	// 		return
+	// 	}
+	// 	dbConnectionString = dbmapper.DbConnectionString(dsn)
+	// }
 }

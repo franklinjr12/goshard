@@ -29,6 +29,6 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Printf("Mappings:\n%v\n%v", dbmapper.DbMapsId, dbmapper.DbMapsUid)
+	fmt.Printf("Mappings:\n%v", dbmapper.DbMapsByUserId)
 	servicelistener.ListenAndServe()
 }
