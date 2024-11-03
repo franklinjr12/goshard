@@ -13,9 +13,9 @@ import (
 )
 
 func main() {
+	sendSchema()
 	sendInsertQuery()
 	sendReadQuery()
-	sendSchema()
 }
 
 func sendReadQuery() {
@@ -29,7 +29,7 @@ func sendInsertQuery() {
 func sendQuery(query string) {
 	request := service.Request{
 		Query:     query,
-		Shardid:   6,
+		Shardid:   7,
 		Sharduid:  "",
 		UserToken: "12345678",
 	}
