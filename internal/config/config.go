@@ -57,6 +57,20 @@ func QueryUserIdFromDbConfig(userToken string) (uint64, error) {
 	return userId, nil
 }
 
+func QueryUserNameFromDbConfig(userToken string) (string, error) {
+	db, err := database.Connect(configDbConnectionString)
+	if err != nil {
+		return "", err
+	}
+	defer database.Close(db)
+	var name string
+	err = db.QueryRow("SELECT name FROM users WHERE token = $1", userToken).Scan(&name)
+	if err != nil {
+		return name, fmt.Errorf("failed to query user name from db: %w", err)
+	}
+	return name, nil
+}
+
 func ReadSchemaFromDbConfig(userId uint64) (string, error) {
 	db, err := database.Connect(configDbConnectionString)
 	if err != nil {
@@ -112,6 +126,12 @@ func WriteSchemaToDbConfig(userId uint64, schema string) error {
 }
 
 func WriteNewMapping(userId uint64, shardid uint64, sharduid string, dsn string) error {
+	// add the new dsn to existing mapping
+	dbmapper.AddDbMapWithUserId(userId, dbmapper.DbMap{
+		Shardid:  shardid,
+		Sharduid: sharduid,
+		Dsn:      dbmapper.DbConnectionString(dsn),
+	})
 	db, err := database.Connect(configDbConnectionString)
 	if err != nil {
 		return err

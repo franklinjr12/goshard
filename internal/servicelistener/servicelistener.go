@@ -179,10 +179,15 @@ func createDatabase(requestParams *service.Request) (string, error) {
 		db.Close()
 		return "", err
 	}
+	userName, err := config.QueryUserNameFromDbConfig(requestParams.UserToken)
+	if err != nil {
+		db.Close()
+		return "", err
+	}
 	if requestParams.Shardid != 0 {
-		dbParams.Dbname = fmt.Sprintf("%s%d", database.DbTestConnectionParams.Dbname, requestParams.Shardid)
+		dbParams.Dbname = fmt.Sprintf("token%s%d", requestParams.UserToken+userName, requestParams.Shardid)
 	} else {
-		dbParams.Dbname = fmt.Sprintf("%s%s", database.DbTestConnectionParams.Dbname, requestParams.Sharduid)
+		dbParams.Dbname = "token" + requestParams.UserToken + userName + requestParams.Sharduid
 	}
 	if !isValidDatabaseName(dbParams.Dbname) {
 		db.Close()
@@ -239,6 +244,7 @@ func fetchConnectionString(userId uint64, serviceRequest *service.Request) (dbma
 		if err != nil {
 			return "", err
 		}
+		fmt.Printf("New database created: %s\n", dsn)
 		err = config.WriteNewMapping(userId, serviceRequest.Shardid, serviceRequest.Sharduid, dsn)
 		if err != nil {
 			return "", err
@@ -246,21 +252,4 @@ func fetchConnectionString(userId uint64, serviceRequest *service.Request) (dbma
 		return dbmapper.DbConnectionString(dsn), nil
 	}
 	return dbConnectionString, nil
-	// // find the database on the map
-	// dbConnectionString, err := dbmapper.GetDbConnectionString(serviceRequest.Shardid, serviceRequest.Sharduid)
-	// if err != nil && !strings.Contains(err.Error(), "dbMap not found") {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-	// fmt.Println("Database connection string:", dbConnectionString)
-	// if dbConnectionString == "" {
-	// 	fmt.Println("Database dsn not found in mapper. Creating new")
-	// 	dsn, err := createDatabase(&serviceRequest)
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		fmt.Fprintln(w, "new database creation failed")
-	// 		return
-	// 	}
-	// 	dbConnectionString = dbmapper.DbConnectionString(dsn)
-	// }
 }

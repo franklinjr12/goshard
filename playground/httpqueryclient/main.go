@@ -13,14 +13,23 @@ import (
 )
 
 func main() {
-	sendQuery()
+	sendInsertQuery()
+	sendReadQuery()
 	sendSchema()
 }
 
-func sendQuery() {
+func sendReadQuery() {
+	sendQuery("SELECT id, name FROM users")
+}
+
+func sendInsertQuery() {
+	sendQuery("insert into users (name) values ('test')")
+}
+
+func sendQuery(query string) {
 	request := service.Request{
-		Query:     "SELECT id, name FROM users",
-		Shardid:   3,
+		Query:     query,
+		Shardid:   6,
 		Sharduid:  "",
 		UserToken: "12345678",
 	}
