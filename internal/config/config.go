@@ -71,6 +71,46 @@ func ReadSchemaFromDbConfig(userId uint64) (string, error) {
 	return schema, nil
 }
 
+func SchemaExists(userId uint64) (bool, error) {
+	db, err := database.Connect(configDbConnectionString)
+	if err != nil {
+		return false, err
+	}
+	defer database.Close(db)
+	var exists bool
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM user_schemas WHERE user_id = $1)", userId).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if schema exists: %w", err)
+	}
+	return exists, nil
+}
+
+func UpdateSchemaInDbConfig(userId uint64, schema string) error {
+	db, err := database.Connect(configDbConnectionString)
+	if err != nil {
+		return err
+	}
+	defer database.Close(db)
+	_, err = db.Exec("UPDATE user_schemas SET schema = $1 WHERE user_id = $2", schema, userId)
+	if err != nil {
+		return fmt.Errorf("failed to update schema in db: %w", err)
+	}
+	return nil
+}
+
+func WriteSchemaToDbConfig(userId uint64, schema string) error {
+	db, err := database.Connect(configDbConnectionString)
+	if err != nil {
+		return err
+	}
+	defer database.Close(db)
+	_, err = db.Exec("INSERT INTO user_schemas (user_id, schema) VALUES ($1, $2)", userId, schema)
+	if err != nil {
+		return fmt.Errorf("failed to write schema to db: %w", err)
+	}
+	return nil
+}
+
 func WriteNewMapping(userId uint64, shardid uint64, sharduid string, dsn string) error {
 	db, err := database.Connect(configDbConnectionString)
 	if err != nil {

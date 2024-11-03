@@ -8,6 +8,7 @@ import (
 	"goshard/internal/database"
 	"goshard/internal/dbmapper"
 	"goshard/lib/service"
+	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 // ListenAndServe starts the HTTP server
 func ListenAndServe() {
 	http.HandleFunc("/query", queryHandler)
+	http.HandleFunc("/schema", schemaHandler)
 	http.ListenAndServe(":8080", nil)
 }
 
@@ -34,6 +36,64 @@ func parseUrlToRequest(r *http.Request) service.Request {
 		Sharduid:  sharduid,
 		UserToken: userToken,
 	}
+}
+
+// will post schema to goshardconfig database
+func schemaHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("URL:", r.URL)
+	fmt.Println("Params:", r.URL.Query())
+	// accept only POST requests
+	if r.Method != http.MethodPost {
+		fmt.Fprintln(w, "Invalid request method. Use POST")
+		return
+	}
+	userToken := r.URL.Query().Get("usertoken")
+	if len(userToken) == 0 {
+		fmt.Fprintln(w, "No user token provided")
+		return
+	}
+	userId, err := config.QueryUserIdFromDbConfig(userToken)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Fprintln(w, "failed to query user id from db")
+		return
+	}
+	fmt.Println("User id:", userId)
+	// get schema from post body
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Fprintln(w, "failed to read request body")
+		return
+	}
+	schema := string(body)
+	fmt.Println("Schema:", schema)
+	exists, err := config.SchemaExists(userId)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Fprintln(w, "failed to check if schema exists")
+		return
+	}
+	if exists {
+		// update schema
+		fmt.Println("Updating schema")
+		err = config.UpdateSchemaInDbConfig(userId, schema)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Fprintln(w, "failed to update schema")
+			return
+		}
+	} else {
+		// create new schema
+		fmt.Println("Creating new schema")
+		err = config.WriteSchemaToDbConfig(userId, schema)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Fprintln(w, "failed to write schema")
+			return
+		}
+	}
+	fmt.Fprintln(w, "Schema written successfully")
 }
 
 func queryHandler(w http.ResponseWriter, r *http.Request) {

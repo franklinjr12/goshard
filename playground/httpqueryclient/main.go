@@ -4,13 +4,20 @@ package main
 
 import (
 	"fmt"
+	"goshard/internal/database"
 	"goshard/lib/service"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 func main() {
+	sendQuery()
+	sendSchema()
+}
+
+func sendQuery() {
 	request := service.Request{
 		Query:     "SELECT id, name FROM users",
 		Shardid:   3,
@@ -42,5 +49,31 @@ func main() {
 		return
 	}
 	fmt.Println(string(body))
+}
 
+func sendSchema() {
+	// build the post request
+	const url = "http://localhost:8080/schema?"
+	userToken := "12345678"
+	urlParams := fmt.Sprintf("usertoken=%s", userToken)
+	fmt.Println("URL:", url+urlParams)
+	schema, err := database.ReadSchemaFromFile("sql/schema.sql")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// send the request
+	req, err := http.Post(url+urlParams, "text/plain", strings.NewReader(schema))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer req.Body.Close()
+	// read the response
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(string(body))
 }
